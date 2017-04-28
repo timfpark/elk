@@ -1,0 +1,199 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{.Values.name}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.name}}
+  labels:
+    app: {{.Values.name}}
+spec:
+  ports:
+  - port: {{.Values.port}}
+    name: {{.Values.port_name}}
+  clusterIP: None
+  selector:
+    name: {{.Values.port_selector}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.cluster_name}}
+  labels:
+    app: {{.Values.cluster_name}}
+spec:
+  ports:
+  - port: {{.Values.cluster_port}}
+    name: {{.Values.cluster_port_name}}
+  clusterIP: None
+  selector:
+    app: {{.Values.name}}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{.Values.master_name}}
+spec:
+  serviceName: "{{.Values.master_name}}"
+  replicas: {{.Values.master_replicas}}
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}
+        name: {{.Values.master_name}}
+      annotations:
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "max-map-count-set",
+                "image": "quay.io/samsung_cnct/set_max_map_count:1.1",
+                "volumeMounts": [
+                    {
+                        "name": "hostproc",
+                        "mountPath": "/hostproc"
+                    }
+                ]
+            }]'
+    spec:
+      serviceAccount: {{.Values.name}}
+      serviceAccountName: {{.Values.name}}
+      imagePullSecrets:
+        - name: {{.Values.image_pull_secret}}
+      containers:
+      - name: {{.Values.name}}
+        image: {{.Values.image}}
+        ports:
+        - name: {{.Values.cluster_port_name}}
+          containerPort: {{.Values.cluster_port}}
+        #  resource notes:  master is light weight so half a CPU.  Less then 4GB causes the container to OOM
+        resources:
+          limits:
+            cpu: {{.Values.master_cpu_limits}}
+            memory: {{.Values.master_memory_limits}}
+          requests:
+            cpu: {{.Values.master_cpu_requests}}
+            memory: {{.Values.master_memory_requests}}
+        env:
+        - name: CLUSTER_NAME
+          value: "{{.Values.cluster_name}}"
+        - name: NODE_DATA
+          value: "false"
+        - name: NODE_MASTER
+          value: "true"
+        - name: SERVICE
+          value: "{{.Values.cluster_name}}"
+        #  the min/max *must* be the same due to elasticsearch 5.0 bootstrap checks
+        - name: ES_JAVA_OPTS
+          value: "-Xms{{ .Values.master_Xms_Xmx }} -Xmx{{ .Values.master_Xms_Xmx }} -Djava.net.preferIPv4Stack=true"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        imagePullPolicy: {{.Values.master_imagePullPolicy}}
+        volumeMounts:
+        - name: esdata
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+      - name: hostproc
+        hostPath:
+          path: /proc
+  volumeClaimTemplates:
+  - metadata:
+      name: esdata
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: fast
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{.Values.master_volume_storage}}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{.Values.data_name}}
+spec:
+  serviceName: "{{.Values.data_name}}"
+  replicas: {{.Values.data_replicas}}
+  template:
+    metadata:
+      labels:
+        app: {{.Values.name}}
+        name: {{.Values.data_name}}
+      annotations:
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "max-map-count-set",
+                "image": "quay.io/samsung_cnct/set_max_map_count:1.1",
+                "volumeMounts": [
+                    {
+                        "name": "hostproc",
+                        "mountPath": "/hostproc"
+                    }
+                ]
+            }]'
+    spec:
+      serviceAccount: {{.Values.name}}
+      serviceAccountName: {{.Values.name}}
+      imagePullSecrets:
+        - name: {{.Values.image_pull_secret}}
+      containers:
+      - name: {{.Values.name}}
+        image: {{.Values.image}}
+        ports:
+        - name: {{.Values.cluster_port_name}}
+          containerPort: {{.Values.cluster_port}}
+        - name: {{.Values.port_name}}
+          containerPort: {{.Values.port}}
+        resources:
+          limits:
+            cpu: {{.Values.data_cpu_limits}}
+            memory: {{.Values.data_memory_limits}}
+          requests:
+            cpu: {{.Values.data_cpu_requests}}
+            memory: {{.Values.data_memory_requests}}
+        env:
+        - name: CLUSTER_NAME
+          value: "{{ .Values.cluster_name }}"
+        - name: NODE_DATA
+          value: "true"
+        - name: NODE_MASTER
+          value: "false"
+        - name: SERVICE
+          value: "{{ .Values.cluster_name }}"
+        #  the min/max *must* be the same due to elasticsearch 5.0 bootstrap checks.  For a production settings
+        #  this should be 16GB.  Don't go over 32GB as the JVM starts to have issues.
+        - name: ES_JAVA_OPTS
+          value: "-Xms{{ .Values.data_Xms_Xmx }} -Xmx{{ .Values.data_Xms_Xmx }} -Djava.net.preferIPv4Stack=true"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: esdata
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+      - name: hostproc
+        hostPath:
+          path: /proc
+  volumeClaimTemplates:
+  - metadata:
+      name: esdata
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: anything
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          #  set to small so when exploring with this the user doesn't accidentally create very large disks
+          storage: {{.Values.data_volume_storage}}

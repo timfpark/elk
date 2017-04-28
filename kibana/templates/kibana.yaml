@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.name}}
+  labels:
+    app: {{.Values.app}}
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Kibana"
+spec:
+  type: LoadBalancer
+  selector:
+    component: {{.Values.component}}
+  ports:
+    - name: http
+      port: {{.Values.port}}
+      protocol: TCP
+  loadBalancerSourceRanges:
+    {{range .Values.lb_source}}
+    - {{.}}
+    {{end}}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{.Values.name}}
+spec:
+  replicas: {{.Values.replicas}}
+  template:
+    metadata:
+      labels:
+        component: {{.Values.component}}
+    spec:
+      containers:
+      - name: {{.Values.container_name}}
+        image: {{.Values.image}}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: {{.Values.cpu_limit}}
+          requests:
+            cpu: {{.Values.cpu_requests}}
+        env:
+          - name: "{{.Values.env_name}}"
+            value: "{{.Values.env_value}}"
+        {{range .Values.env_vars}}
+          - name: {{.name}}
+            value: "{{.value}}"
+        {{end}}
+        ports:
+        - containerPort: {{.Values.container_port}}
+          name: ui
+          protocol: TCP

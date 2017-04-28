@@ -1,0 +1,8 @@
+apiVersion: v1
+description: A Kibana Helm chart for Kubernetes
+name: kibana
+version: 0.1.0
+keywords: [kibana, data]
+maintainers:
+ - name: Leah Petersen
+   email: leahnpetersen@gmail.com
