@@ -7,13 +7,13 @@ port: 5601
 component: kibana-logging
 replicas: 3
 container_name: kibana-logging
-image: kibana:5.2.0
+image: kibana:4.6.4
 #image: docker.elastic.co/kibana/kibana:5.2.0
 # keep request = limit to keep this container in guaranteed class
 cpu_limit: 200m
 cpu_requests: 200m
 env_name: ELASTICSEARCH_URL
-env_value: http://elasticsearch:9200
+env_value: http://elasticsearch-es.default.svc.cluster.local:9200 
 container_port: 5601
 
 env_vars:
@@ -21,6 +21,3 @@ env_vars:
     value: false
   - name: XPACK_MONITORING_ENABLED
     value: false
-
-lb_source:
-  - 204.128.192.0/24

@@ -1,0 +1,73 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: "{{ printf "%s-client-%s" .Release.Name .Values.Name | trunc 24 }}"
+  labels:
+    heritage: {{.Release.Service | quote }}
+    release: {{.Release.Name | quote }}
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    component: "{{.Release.Name}}-{{.Values.Component}}"
+    type: client
+spec:
+  replicas: {{default 2 .Values.ClientReplicas }}
+  template:
+    metadata:
+      labels:
+        heritage: {{.Release.Service | quote }}
+        release: {{.Release.Name | quote }}
+        chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+        component: "{{.Release.Name}}-{{.Values.Component}}"
+        type: client
+    spec:
+      serviceAccountName: "{{ printf "%s-%s" .Release.Name .Values.Name | trunc 24 }}"
+      containers:
+      - name: elasticsearch
+        env:
+        - name: SERVICE
+          value: "{{ printf "%s-cluster-%s" .Release.Name .Values.Name | trunc 24 }}"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_DATA
+          value: "false"
+        - name: NODE_MASTER
+          value: "false"
+        - name: PROCESSORS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: ES_JAVA_OPTS
+          value: "-Djava.net.preferIPv4Stack=true -Xms{{.Values.ClientHeapSize}} -Xmx{{.Values.ClientHeapSize}}"
+        - name: KUBERNETES_MASTER
+          value: kubernetes.default.svc.cluster.local
+        resources:
+          requests:
+            cpu: "{{.Values.ClientCpuRequests}}"
+            memory: "{{.Values.ClientMemoryRequests}}"
+          limits:
+            cpu: "{{.Values.ClientCpuLimits}}"
+            memory: "{{.Values.ClientMemoryLimits}}"
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+          initialDelaySeconds: 5
+        image: "{{.Values.Image}}:{{.Values.ImageTag}}"
+        imagePullPolicy: "{{.Values.ImagePullPolicy}}"
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          name: elasticsearch-config
+          subPath: elasticsearch.yml
+        - mountPath: /usr/share/elasticsearch/config/logging.yml
+          name: elasticsearch-config
+          subPath: logging.yml
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: "{{ printf "%s-%s" .Release.Name .Values.Name | trunc 24 }}"

@@ -14,10 +14,6 @@ spec:
     - name: http
       port: {{.Values.port}}
       protocol: TCP
-  loadBalancerSourceRanges:
-    {{range .Values.lb_source}}
-    - {{.}}
-    {{end}}
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment

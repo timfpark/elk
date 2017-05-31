@@ -1,0 +1,111 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: "{{ printf "%s-data-%s" .Release.Name .Values.Name | trunc 24 }}"
+  labels:
+    heritage: {{.Release.Service | quote }}
+    release: {{.Release.Name | quote }}
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    component: "{{.Release.Name}}-{{.Values.Component}}"
+    type: data
+spec:
+  serviceName: "{{ printf "%s-data-%s" .Release.Name .Values.Name | trunc 24 }}"
+  replicas: {{default 3 .Values.DataReplicas }}
+  template:
+    metadata:
+      labels:
+        heritage: {{.Release.Service | quote }}
+        release: {{.Release.Name | quote }}
+        chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+        component: "{{.Release.Name}}-{{.Values.Component}}"
+        type: data
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        # see https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html
+        # and https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-configuration-memory.html#mlockall
+        pod.alpha.kubernetes.io/init-containers: '[
+          {
+            "name": "sysctl",
+            "image": "busybox",
+            "imagePullPolicy": "Always",
+            "command": ["sysctl", "-w", "vm.max_map_count=262144"],
+            "securityContext": {
+              "privileged": true
+            }
+          }
+        ]'
+    spec:
+      serviceAccountName: "{{ printf "%s-%s" .Release.Name .Values.Name | trunc 24 }}"
+      containers:
+      - name: elasticsearch
+        env:
+        - name: SERVICE
+          value: "{{ printf "%s-cluster-%s" .Release.Name .Values.Name | trunc 24 }}"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_MASTER
+          value: "false"
+        - name: PROCESSORS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: ES_JAVA_OPTS
+          value: "-Djava.net.preferIPv4Stack=true -Xms{{.Values.DataHeapSize}} -Xmx{{.Values.DataHeapSize}}"
+        - name: KUBERNETES_MASTER
+          value: kubernetes.default.svc.cluster.local
+        image: "{{.Values.Image}}:{{.Values.ImageTag}}"
+        imagePullPolicy: "{{.Values.ImagePullPolicy}}"
+        ports:
+        - containerPort: 9300
+          name: transport
+        resources:
+          requests:
+            cpu: "{{.Values.DataCpuRequests}}"
+            memory: "{{.Values.DataMemoryRequests}}"
+          limits:
+            cpu: "{{.Values.DataCpuLimits}}"
+            memory: "{{.Values.DataMemoryLimits}}"
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health?local=true
+            port: 9200
+          initialDelaySeconds: 5
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: elasticsearch-data
+        - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          name: elasticsearch-config
+          subPath: elasticsearch.yml
+        - mountPath: /usr/share/elasticsearch/config/logging.yml
+          name: elasticsearch-config
+          subPath: logging.yml
+        - name: elasticsearch-config
+          mountPath: /pre-stop-hook.sh
+          subPath: pre-stop-hook.sh
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash","/pre-stop-hook.sh"]
+      terminationGracePeriodSeconds: {{.Values.DataTerminationGracePeriodSeconds}}
+      volumes:
+      - name: elasticsearch-config
+        configMap:
+          name: "{{ printf "%s-%s" .Release.Name .Values.Name | trunc 24 }}"
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    {{- if .Values.DataStorageClass }}
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "{{.Values.DataStorageClass}}"
+    {{- end }}
+    spec:
+      accessModes: [ ReadWriteOnce ]
+      resources:
+        requests:
+          storage: "{{.Values.DataStorage}}"
