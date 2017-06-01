@@ -104,11 +104,12 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: elasticsearch-data
+      {{- if .Values.DataStorageClass }}
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "{{.Values.DataStorageClass}}"
+      {{- end }}
     spec:
       accessModes: [ ReadWriteOnce ]
-    {{- if .Values.DataStorageClass }}
-      storageClassName: "{{.Values.DataStorageClass}}"
-    {{- end }}
       resources:
         requests:
           storage: "{{.Values.DataStorage}}"

@@ -7,9 +7,10 @@ metadata:
     release: {{.Release.Name | quote }}
     chart: "{{.Chart.Name}}-{{.Chart.Version}}"
 spec:
+  type: LoadBalancer
   ports:
     - port: 9200
       targetPort: http
   selector:
     component: "{{.Release.Name}}-{{.Values.Component}}"
-    type: LoadBalancer 
+    type: client

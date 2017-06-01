@@ -13,7 +13,7 @@ image: kibana:4.6.4
 cpu_limit: 200m
 cpu_requests: 200m
 env_name: ELASTICSEARCH_URL
-env_value: http://elasticsearch-es.elasticsearch.svc.cluster.local:9200
+env_value: http://es-es.esearch.svc.cluster.local:9200
 container_port: 5601
 
 env_vars:
