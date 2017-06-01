@@ -55,6 +55,8 @@ spec:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
+        - name: SERVICE_DNS
+          value: "{{ printf "%s-cluster-%s" .Release.Name .Values.Name | trunc 24 }}"
         - name: ES_JAVA_OPTS
           value: "-Djava.net.preferIPv4Stack=true -Xms{{.Values.DataHeapSize}} -Xmx{{.Values.DataHeapSize}}"
         - name: KUBERNETES_MASTER
@@ -79,19 +81,21 @@ spec:
         volumeMounts:
         - mountPath: /usr/share/elasticsearch/data
           name: elasticsearch-data
-        - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          #- mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+        - mountPath: /usr/share/elasticsearch/config/
           name: elasticsearch-config
-          subPath: elasticsearch.yml
-        - mountPath: /usr/share/elasticsearch/config/logging.yml
-          name: elasticsearch-config
-          subPath: logging.yml
-        - name: elasticsearch-config
-          mountPath: /pre-stop-hook.sh
-          subPath: pre-stop-hook.sh
+          #subPath: elasticsearch.yml
+          #- mountPath: /usr/share/elasticsearch/config/logging.yml
+          #- mountPath: /usr/share/elasticsearch/config/
+          #name: elasticsearch-config
+          #subPath: logging.yml
+          #- name: elasticsearch-config
+          #mountPath: /pre-stop-hook.sh
+          #subPath: pre-stop-hook.sh
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/bash","/pre-stop-hook.sh"]
+              command: ["/bin/bash","/usr/share/elasticsearch/config/pre-stop-hook.sh"]
       terminationGracePeriodSeconds: {{.Values.DataTerminationGracePeriodSeconds}}
       volumes:
       - name: elasticsearch-config
@@ -100,12 +104,11 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: elasticsearch-data
-    {{- if .Values.DataStorageClass }}
-      annotations:
-        volume.beta.kubernetes.io/storage-class: "{{.Values.DataStorageClass}}"
-    {{- end }}
     spec:
       accessModes: [ ReadWriteOnce ]
+    {{- if .Values.DataStorageClass }}
+      storageClassName: "{{.Values.DataStorageClass}}"
+    {{- end }}
       resources:
         requests:
           storage: "{{.Values.DataStorage}}"

@@ -78,7 +78,6 @@ data:
       kubernetes:
         service: ${SERVICE}
         namespace: ${KUBERNETES_NAMESPACE}
-
     discovery:
       type: kubernetes
       zen:

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    chart: elasticsearch-0.1.6
+    heritage: Tiller
+    release: elasticsearch
+  name: elasticsearch-es
+  namespace: elasticsearch
+  selfLink: /api/v1/namespaces/elasticsearch/services/elasticsearch-es
+spec:
+  ports:
+  - port: 9200
+    protocol: TCP
+    targetPort: http
+  selector:
+    component: elasticsearch-elasticsearch
+    type: client
+  type: LoadBalancer 

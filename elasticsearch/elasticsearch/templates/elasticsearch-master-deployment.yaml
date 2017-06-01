@@ -1,15 +1,15 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: "{{ printf "%s-client-%s" .Release.Name .Values.Name | trunc 24 }}"
+  name: "{{ printf "%s-master-%s" .Release.Name .Values.Name | trunc 24 }}"
   labels:
     heritage: {{.Release.Service | quote }}
     release: {{.Release.Name | quote }}
     chart: "{{.Chart.Name}}-{{.Chart.Version}}"
     component: "{{.Release.Name}}-{{.Values.Component}}"
-    type: client
+    type: master
 spec:
-  replicas: {{default 2 .Values.ClientReplicas }}
+  replicas: {{default 2 .Values.MasterReplicas }}
   template:
     metadata:
       labels:
@@ -17,7 +17,7 @@ spec:
         release: {{.Release.Name | quote }}
         chart: "{{.Chart.Name}}-{{.Chart.Version}}"
         component: "{{.Release.Name}}-{{.Values.Component}}"
-        type: client
+        type: master
     spec:
       serviceAccountName: "{{ printf "%s-%s" .Release.Name .Values.Name | trunc 24 }}"
       containers:
@@ -31,23 +31,23 @@ spec:
               fieldPath: metadata.namespace
         - name: NODE_DATA
           value: "false"
-        - name: NODE_MASTER
-          value: "false"
         - name: PROCESSORS
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
+        - name: SERVICE_DNS
+          value: "{{ printf "%s-cluster-%s" .Release.Name .Values.Name | trunc 24 }}" 
         - name: ES_JAVA_OPTS
-          value: "-Djava.net.preferIPv4Stack=true -Xms{{.Values.ClientHeapSize}} -Xmx{{.Values.ClientHeapSize}}"
+          value: "-Djava.net.preferIPv4Stack=true -Xms{{.Values.MasterHeapSize}} -Xmx{{.Values.MasterHeapSize}}"
         - name: KUBERNETES_MASTER
           value: kubernetes.default.svc.cluster.local
         resources:
           requests:
-            cpu: "{{.Values.ClientCpuRequests}}"
-            memory: "{{.Values.ClientMemoryRequests}}"
+            cpu: "{{.Values.MasterCpuRequests}}"
+            memory: "{{.Values.MasterMemoryRequests}}"
           limits:
-            cpu: "{{.Values.ClientCpuLimits}}"
-            memory: "{{.Values.ClientMemoryLimits}}"
+            cpu: "{{.Values.MasterCpuLimits}}"
+            memory: "{{.Values.MasterMemoryLimits}}"
         readinessProbe:
           httpGet:
             path: /_cluster/health?local=true
@@ -56,17 +56,17 @@ spec:
         image: "{{.Values.Image}}:{{.Values.ImageTag}}"
         imagePullPolicy: "{{.Values.ImagePullPolicy}}"
         ports:
-        - containerPort: 9200
-          name: http
         - containerPort: 9300
           name: transport
         volumeMounts:
-        - mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          #- mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+        - mountPath: /usr/share/elasticsearch/config/
           name: elasticsearch-config
-          subPath: elasticsearch.yml
-        - mountPath: /usr/share/elasticsearch/config/logging.yml
-          name: elasticsearch-config
-          subPath: logging.yml
+          #subPath: elasticsearch.yml
+          #- mountPath: /usr/share/elasticsearch/config/logging.yml
+          #- mountPath: /usr/share/elasticsearch/
+          #name: elasticsearch-config
+          #subPath: logging.yml
       volumes:
       - name: elasticsearch-config
         configMap:

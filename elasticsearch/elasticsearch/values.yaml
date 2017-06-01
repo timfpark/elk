@@ -7,8 +7,10 @@ Name: es
 PeerPort: 2380
 ClientPort: 2379
 Component: "elasticsearch"
+#Image: "jetstack/elasticsearch-pet"
 Image: "jetstack/elasticsearch-pet"
-ImageTag: "5.2.2"
+ImageTag: "2.4.0"
+#ImageTag: "5.2.2"
 ImagePullPolicy: "Always"
 ClientReplicas: 2
 ClientCpuRequests: "25m"
@@ -22,12 +24,15 @@ MasterMemoryRequests: "256Mi"
 MasterCpuLimits: "1"
 MasterMemoryLimits: "512Mi"
 MasterHeapSize: "128m"
-DataReplicas: 3
+DataReplicas: 2
 DataCpuRequests: "250m"
-DataMemoryRequests: "2Gi"
+DataMemoryRequests: "750m"
 DataCpuLimits: "1"
-DataMemoryLimits: "4Gi"
+DataMemoryLimits: "1Gi"
 DataHeapSize: "1536m"
 DataStorage: "128Gi"
+# DataStorageClass: "ssd"
 DataStorageClass: "fast"
 DataTerminationGracePeriodSeconds: 3600
+ServiceDns: "elasticsearch-es"
+#ServiceDns: {{ printf "%s-cluster-%s" .Release.Name .Values.Name | trunc 24 }}
